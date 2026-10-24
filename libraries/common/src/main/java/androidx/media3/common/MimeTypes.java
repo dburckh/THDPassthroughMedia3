@@ -17,6 +17,8 @@ package androidx.media3.common;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import android.media.MediaCodecInfo;
+import android.media.MediaCodecList;
 import android.text.TextUtils;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
@@ -57,7 +59,30 @@ public final class MimeTypes {
   public static final String VIDEO_MPEG = BASE_TYPE_VIDEO + "/mpeg";
   public static final String VIDEO_PS = BASE_TYPE_VIDEO + "/mp2p";
   public static final String VIDEO_MPEG2 = BASE_TYPE_VIDEO + "/mpeg2";
-  public static final String VIDEO_VC1 = BASE_TYPE_VIDEO + "/wvc1";
+  private static final String VIDEO_VC1_NVIDIA = BASE_TYPE_VIDEO + "/wvc1";
+  private static final String VIDEO_VC1_IANA = BASE_TYPE_VIDEO + "/vc1";
+  public static final String VIDEO_VC1;
+
+  static {
+      MediaCodecInfo[] mediaCodecInfos = new MediaCodecList(MediaCodecList.REGULAR_CODECS).getCodecInfos();
+
+      final String[] vc1MimeTypes = {VIDEO_VC1_IANA, VIDEO_VC1_NVIDIA};
+      String vc1Type = VIDEO_VC1_NVIDIA;
+      for (MediaCodecInfo mediaCodecInfo : mediaCodecInfos) {
+        if (mediaCodecInfo.isEncoder()) {
+          continue;
+        }
+        for (String mimeType : mediaCodecInfo.getSupportedTypes()) {
+          for (String vc1MimeType : vc1MimeTypes) {
+            if (vc1MimeType.equalsIgnoreCase(mimeType)) {
+              vc1Type = vc1MimeType;
+              break;
+            }
+          }
+        }
+      }
+      VIDEO_VC1 = vc1Type;
+  }
   public static final String VIDEO_DIVX = BASE_TYPE_VIDEO + "/divx";
   @UnstableApi public static final String VIDEO_FLV = BASE_TYPE_VIDEO + "/x-flv";
   public static final String VIDEO_DOLBY_VISION = BASE_TYPE_VIDEO + "/dolby-vision";

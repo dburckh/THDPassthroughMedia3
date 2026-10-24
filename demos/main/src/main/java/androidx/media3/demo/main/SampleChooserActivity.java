@@ -20,6 +20,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
 import android.Manifest;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -45,6 +46,8 @@ import android.widget.ExpandableListView.OnChildClickListener;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
 import androidx.annotation.RequiresApi;
@@ -85,6 +88,7 @@ public class SampleChooserActivity extends AppCompatActivity
   private static final String TAG = "SampleChooserActivity";
   private static final String GROUP_POSITION_PREFERENCE_KEY = "sample_chooser_group_position";
   private static final String CHILD_POSITION_PREFERENCE_KEY = "sample_chooser_child_position";
+  private static final Uri USER_CONTENT = new Uri.Builder().scheme(ContentResolver.SCHEME_CONTENT).authority("user").build();
 
   private String[] uris;
   private boolean useExtensionRenderers;
@@ -94,6 +98,13 @@ public class SampleChooserActivity extends AppCompatActivity
   private ExpandableListView sampleListView;
   @Nullable private MediaItem downloadMediaItemWaitingForNotificationPermission;
   private boolean notificationPermissionToastShown;
+  private final ActivityResultLauncher<String[]> openDocumentLauncher = registerForActivityResult(
+      new ActivityResultContracts.OpenDocument(), uri -> {
+        if (uri != null) {
+          final MediaItem mediaItem = new MediaItem.Builder().setUri(uri).build();
+          startPlayer(Collections.singletonList(mediaItem));
+        }
+      });
 
   @Override
   public void onCreate(Bundle savedInstanceState) {
@@ -234,15 +245,25 @@ public class SampleChooserActivity extends AppCompatActivity
     prefEditor.apply();
 
     PlaylistHolder playlistHolder = (PlaylistHolder) view.getTag();
+    final List<MediaItem> mediaItems = playlistHolder.mediaItems;
+    if (!mediaItems.isEmpty()) {
+      final MediaItem mediaItem = mediaItems.get(0);
+      if (mediaItem.localConfiguration != null && USER_CONTENT.equals(mediaItem.localConfiguration.uri)) {
+        openDocumentLauncher.launch(new String[]{"video/*","audio/*"});
+        return true;
+      }
+    }
+    startPlayer(playlistHolder.mediaItems);
+    return true;
+  }
+  private void startPlayer(final List<MediaItem> mediaItems) {
     Intent intent = new Intent(this, PlayerActivity.class);
     intent.putExtra(
         IntentUtil.PREFER_EXTENSION_DECODERS_EXTRA,
         isNonNullAndChecked(preferExtensionDecodersMenuItem));
-    IntentUtil.addToIntent(playlistHolder.mediaItems, intent);
+    IntentUtil.addToIntent(mediaItems, intent);
     startActivity(intent);
-    return true;
   }
-
   private void onSampleDownloadButtonClicked(PlaylistHolder playlistHolder) {
     int downloadUnsupportedStringId = getDownloadUnsupportedStringId(playlistHolder);
     if (downloadUnsupportedStringId != 0) {
